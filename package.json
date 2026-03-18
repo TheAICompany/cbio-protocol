@@ -1,0 +1,27 @@
+{
+  "name": "@the-ai-company/cbio-protocol",
+  "version": "1.0.0",
+  "description": "Claw-biometric Protocol: Identity, Governance, and Verification Primitives",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test tests/**/*.js"
+  },
+  "keywords": [
+    "cbio",
+    "agent-identity",
+    "protocol",
+    "governance"
+  ],
+  "author": "TheAICompany",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
