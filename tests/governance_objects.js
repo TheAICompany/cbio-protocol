@@ -12,7 +12,7 @@ import {
     verifyDelegationCertificate,
     verifyRevocationRecord,
     verifyAuthorityChain,
-} from '../src/index.js';
+} from '../dist/index.js';
 
 function nowIso() {
     return new Date().toISOString();
@@ -33,7 +33,7 @@ async function testGovernanceSigningAndVerification() {
     assert.ok(verifyAuthorityIdentity(authorityIdentity), 'authority identity should verify');
 
     const issuedUnsigned = {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'issued_agent_identity',
         agent: childRef,
         authority: rootRef,
@@ -51,7 +51,7 @@ async function testGovernanceSigningAndVerification() {
     assert.ok(verifyIssuedAgentIdentity(issued), 'issued agent identity should verify');
 
     const delegationUnsigned = {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'delegation_certificate',
         issuer: childRef,
         delegate: delegateRef,
@@ -68,7 +68,7 @@ async function testGovernanceSigningAndVerification() {
     assert.ok(verifyDelegationCertificate(delegation), 'delegation certificate should verify');
 
     const chain = {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'authority_chain',
         authority_root: authorityIdentity,
         issued_agent: issued,
@@ -77,7 +77,7 @@ async function testGovernanceSigningAndVerification() {
     assert.ok(verifyAuthorityChain(chain), 'authority chain should verify before revocation');
 
     const revocationUnsigned = {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'revocation_record',
         issuer: childRef,
         target: {
@@ -110,7 +110,7 @@ async function testGovernanceTamperResistance() {
     const childRef = createIdentityRef(childKeys.publicKey);
 
     const issued = signIssuedAgentIdentity(rootKeys.privateKey, {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'issued_agent_identity',
         agent: childRef,
         authority: rootRef,
@@ -158,7 +158,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
 
     const authorityIdentity = createAuthorityIdentity(rootRef);
     const issued = signIssuedAgentIdentity(rootKeys.privateKey, {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'issued_agent_identity',
         agent: childRef,
         authority: rootRef,
@@ -169,7 +169,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
     });
 
     const validDelegation = signDelegationCertificate(childKeys.privateKey, {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'delegation_certificate',
         issuer: childRef,
         delegate: delegateRef,
@@ -182,7 +182,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
 
     assert.ok(
         verifyAuthorityChain({
-            cbio_protocol: 'v3.0',
+            cbio_protocol: 'v1.0',
             kind: 'authority_chain',
             authority_root: authorityIdentity,
             issued_agent: issued,
@@ -192,7 +192,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
     );
 
     const invalidDelegation = signDelegationCertificate(outsiderKeys.privateKey, {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'delegation_certificate',
         issuer: outsiderRef,
         delegate: delegateRef,
@@ -204,7 +204,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
     });
     assert.strictEqual(
         verifyAuthorityChain({
-            cbio_protocol: 'v3.0',
+            cbio_protocol: 'v1.0',
             kind: 'authority_chain',
             authority_root: authorityIdentity,
             issued_agent: issued,
@@ -215,7 +215,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
     );
 
     const invalidRevocation = signRevocationRecord(outsiderKeys.privateKey, {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'revocation_record',
         issuer: outsiderRef,
         target: {
@@ -229,7 +229,7 @@ async function testAuthorityChainGovernanceRelationshipChecks() {
     });
     assert.strictEqual(
         verifyAuthorityChain({
-            cbio_protocol: 'v3.0',
+            cbio_protocol: 'v1.0',
             kind: 'authority_chain',
             authority_root: authorityIdentity,
             issued_agent: issued,

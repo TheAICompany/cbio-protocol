@@ -6,7 +6,7 @@ Este documento define a **Matriz de capacidades** e o modelo de governança do p
 
 ## 1. Identidade sobre papéis
 
-No CBIO v3.0 não há "papéis" fixos (como Admin ou User). Cada entidade é uma **Identidade** de primeira classe com suas próprias chaves criptográficas e vault.
+No CBIO v1.0 não há "papéis" fixos (como Admin ou User). Cada entidade é uma **Identidade** de primeira classe com suas próprias chaves criptográficas e vault.
 
 Diferentes comportamentos operacionais são alcançados delegando **Capacidades** específicas a um handle de identidade (CbioAgent).
 

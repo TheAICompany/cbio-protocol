@@ -87,7 +87,7 @@ complete protocol by themselves.
 
 ```ts
 interface AuthorityIdentity {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'authority_identity';
   authority: {
     agent_id: string;
@@ -107,7 +107,7 @@ begins.
 
 ```ts
 interface IssuedAgentIdentity {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'issued_agent_identity';
   agent: {
     agent_id: string;
@@ -134,7 +134,7 @@ interface IssuedAgentIdentity {
 
 ```ts
 interface DelegationCertificate {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'delegation_certificate';
   issuer: {
     agent_id: string;
@@ -161,7 +161,7 @@ interface DelegationCertificate {
 
 ```ts
 interface RevocationRecord {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'revocation_record';
   issuer: {
     agent_id: string;
@@ -185,7 +185,7 @@ interface RevocationRecord {
 
 ```ts
 interface AuthorityChain {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'authority_chain';
   authority_root: AuthorityIdentity;
   issued_agent: IssuedAgentIdentity;

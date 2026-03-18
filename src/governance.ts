@@ -13,7 +13,7 @@
 import { derivePublicKey, signPayload, verifySignature } from './crypto.js';
 import { deriveRootAgentId } from './identity.js';
 
-export type GovernanceProtocolVersion = 'v3.0';
+export type GovernanceProtocolVersion = 'v1.0';
 
 export interface GovernanceIdentityRef {
     agent_id: string;
@@ -125,7 +125,7 @@ export function createIdentityRef(publicKey: string, keyVersion = 1): Governance
 
 export function createAuthorityIdentity(authority: GovernanceIdentityRef): AuthorityIdentity {
     return {
-        cbio_protocol: 'v3.0',
+        cbio_protocol: 'v1.0',
         kind: 'authority_identity',
         authority,
     };
@@ -226,7 +226,7 @@ export function verifyGovernanceIdentityRef(identity: GovernanceIdentityRef): bo
 }
 
 export function verifyAuthorityIdentity(identity: AuthorityIdentity): boolean {
-    return identity.cbio_protocol === 'v3.0'
+    return identity.cbio_protocol === 'v1.0'
         && identity.kind === 'authority_identity'
         && verifyGovernanceIdentityRef(identity.authority);
 }
@@ -242,7 +242,7 @@ function delegationLookupKey(delegateAgentId: string, sequence: number): string 
 }
 
 export function verifyIssuedAgentIdentity(object: IssuedAgentIdentity, now = Date.now()): boolean {
-    if (object.cbio_protocol !== 'v3.0' || object.kind !== 'issued_agent_identity') return false;
+    if (object.cbio_protocol !== 'v1.0' || object.kind !== 'issued_agent_identity') return false;
     if (!verifyGovernanceIdentityRef(object.agent)) return false;
     if (!verifyGovernanceIdentityRef(object.authority)) return false;
     if (isExpired(object.issuance.expires_at, now)) return false;
@@ -263,7 +263,7 @@ export function verifyIssuedAgentIdentity(object: IssuedAgentIdentity, now = Dat
 }
 
 export function verifyDelegationCertificate(object: DelegationCertificate, now = Date.now()): boolean {
-    if (object.cbio_protocol !== 'v3.0' || object.kind !== 'delegation_certificate') return false;
+    if (object.cbio_protocol !== 'v1.0' || object.kind !== 'delegation_certificate') return false;
     if (!verifyGovernanceIdentityRef(object.issuer)) return false;
     if (!verifyGovernanceIdentityRef(object.delegate)) return false;
     if (isExpired(object.delegation.expires_at, now)) return false;
@@ -282,7 +282,7 @@ export function verifyDelegationCertificate(object: DelegationCertificate, now =
 }
 
 export function verifyRevocationRecord(object: RevocationRecord): boolean {
-    if (object.cbio_protocol !== 'v3.0' || object.kind !== 'revocation_record') return false;
+    if (object.cbio_protocol !== 'v1.0' || object.kind !== 'revocation_record') return false;
     if (!verifyGovernanceIdentityRef(object.issuer)) return false;
     const unsigned: UnsignedRevocationRecord = {
         cbio_protocol: object.cbio_protocol,
@@ -299,7 +299,7 @@ export function verifyRevocationRecord(object: RevocationRecord): boolean {
 }
 
 export function verifyAuthorityChain(chain: AuthorityChain, now = Date.now()): boolean {
-    if (chain.cbio_protocol !== 'v3.0' || chain.kind !== 'authority_chain') return false;
+    if (chain.cbio_protocol !== 'v1.0' || chain.kind !== 'authority_chain') return false;
     if (!verifyAuthorityIdentity(chain.authority_root)) return false;
     if (chain.authority_root.authority.agent_id !== chain.issued_agent.authority.agent_id) return false;
     if (chain.authority_root.authority.public_key !== chain.issued_agent.authority.public_key) return false;

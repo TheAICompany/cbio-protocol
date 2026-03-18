@@ -6,7 +6,7 @@ This document defines the **Capability Matrix** and governance model for the Cla
 
 ## 1. Identity over Roles
 
-In CBIO v3.0, there are no fixed "Roles" (like Admin or User). Every entity is a first-class **Identity** with its own cryptographic keys and vault. 
+In CBIO v1.0, there are no fixed "Roles" (like Admin or User). Every entity is a first-class **Identity** with its own cryptographic keys and vault. 
 
 Different operational behaviors are achieved by delegating specific **Capabilities** to an identity handle (CbioAgent).
 

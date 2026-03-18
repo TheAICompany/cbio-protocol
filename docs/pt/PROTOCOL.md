@@ -78,7 +78,7 @@ São primitivas criptográficas e de derivação de identidade. Não constituem 
 
 ```ts
 interface AuthorityIdentity {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'authority_identity';
   authority: { agent_id, public_key, key_version };
 }
@@ -90,7 +90,7 @@ interface AuthorityIdentity {
 
 ```ts
 interface IssuedAgentIdentity {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'issued_agent_identity';
   agent: { agent_id, public_key, key_version };
   authority: { agent_id, public_key, key_version };
@@ -105,7 +105,7 @@ interface IssuedAgentIdentity {
 
 ```ts
 interface DelegationCertificate {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'delegation_certificate';
   issuer: { agent_id, public_key, key_version };
   delegate: { agent_id, public_key, key_version };
@@ -118,7 +118,7 @@ interface DelegationCertificate {
 
 ```ts
 interface RevocationRecord {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'revocation_record';
   issuer: { agent_id, public_key, key_version };
   target: { kind, subject_agent_id, sequence };
@@ -131,7 +131,7 @@ interface RevocationRecord {
 
 ```ts
 interface AuthorityChain {
-  cbio_protocol: 'v3.0';
+  cbio_protocol: 'v1.0';
   kind: 'authority_chain';
   authority_root: AuthorityIdentity;
   issued_agent: IssuedAgentIdentity;

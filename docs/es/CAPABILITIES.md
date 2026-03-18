@@ -6,7 +6,7 @@ Este documento define la **Matriz de capacidades** y el modelo de gobernanza del
 
 ## 1. Identidad sobre roles
 
-En CBIO v3.0 no hay "roles" fijos (como Admin o User). Cada entidad es una **Identidad** de primera clase con sus propias claves criptográficas y vault.
+En CBIO v1.0 no hay "roles" fijos (como Admin o User). Cada entidad es una **Identidad** de primera clase con sus propias claves criptográficas y vault.
 
 Diferentes comportamientos operativos se logran delegando **Capacidades** específicas a un handle de identidad (CbioAgent).
 

@@ -1,6 +1,6 @@
 {
   "name": "@the-ai-company/cbio-protocol",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Claw-biometric Protocol: Identity, Governance, and Verification Primitives",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,7 +14,7 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "node --test tests/**/*.js"
+    "test": "npm run build && node --test tests/**/*.js"
   },
   "keywords": [
     "cbio",

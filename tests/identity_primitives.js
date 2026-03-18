@@ -3,7 +3,7 @@
  * Covers: deterministic root identity derivation.
  */
 
-import { generateIdentityKeys, deriveRootAgentId } from '../src/index.js';
+import { generateIdentityKeys, deriveRootAgentId } from '../dist/index.js';
 import assert from 'node:assert';
 
 async function testDeriveRootIdentity() {

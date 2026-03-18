@@ -6,7 +6,7 @@ Ce document définit la **Matrice des capacités** et le modèle de gouvernance 
 
 ## 1. Identité plutôt que rôles
 
-Dans CBIO v3.0, il n'y a pas de « rôles » fixes (comme Admin ou User). Chaque entité est une **Identité** de première classe avec ses propres clés cryptographiques et vault.
+Dans CBIO v1.0, il n'y a pas de « rôles » fixes (comme Admin ou User). Chaque entité est une **Identité** de première classe avec ses propres clés cryptographiques et vault.
 
 Différents comportements opérationnels sont atteints en déléguant des **Capacités** spécifiques à un handle d'identité (CbioAgent).
 
