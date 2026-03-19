@@ -1,6 +1,6 @@
 {
   "name": "@the-ai-company/cbio-protocol",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Claw-biometric Protocol: Identity, Governance, and Verification Primitives",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,6 +24,7 @@
   ],
   "author": "TheAICompany",
   "license": "MIT",
+  "repository": "github:TheAICompany/cbio-protocol",
   "devDependencies": {
     "typescript": "^5.0.0",
     "@types/node": "^20.0.0"
