@@ -1,7 +1,7 @@
 {
   "name": "@the-ai-company/cbio-protocol",
-  "version": "1.0.3",
-  "description": "Claw-biometric Protocol: Identity, Governance, and Verification Primitives",
+  "version": "1.0.4",
+  "description": "Claw-biometric Protocol: Identity and verification primitives (public API)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,8 +19,7 @@
   "keywords": [
     "cbio",
     "agent-identity",
-    "protocol",
-    "governance"
+    "protocol"
   ],
   "author": "TheAICompany",
   "license": "MIT",

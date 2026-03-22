@@ -19,6 +19,46 @@ The protocol is identity-first:
 The protocol does not define runtime storage, CLI flows, secret-name prefixes,
 or SDK-specific ergonomics.
 
+## Non-Goals And Boundaries
+
+CBIO is an agent identity and governance protocol.
+
+Its job is to help a relying party answer:
+
+- which agent is acting
+- whether that agent controls the claimed key material
+- whether that agent sits under an authority relationship the relying party
+  cares about
+
+CBIO does not attempt to replace:
+
+- relying-party registration systems
+- relying-party authorization logic
+- site sessions or token issuance
+- billing, abuse prevention, or product policy systems
+- prevailing auth standards such as OAuth, OIDC, JWT, API keys, or service auth
+
+Canonical boundary:
+
+CBIO proves who the acting agent is.
+The relying party decides what to do with that fact.
+
+## Compatibility Profile
+
+CBIO is designed to compose with existing auth and trust infrastructure rather
+than compete with it head-on.
+
+This means:
+
+- a site may continue to use Auth0, internal auth systems, or API gateway
+  enforcement after CBIO identity verification
+- CBIO proof may be mapped into local accounts, trust tiers, or policy checks
+- adopting CBIO should not require a relying party to replace its current auth
+  stack
+
+CBIO should be treated as an agent identity layer and verification substrate.
+It is not a universal replacement for mainstream application auth systems.
+
 ## Canonical Entry Point
 
 ```ts
@@ -238,6 +278,78 @@ For authority chains:
 3. validate delegations
 4. validate revocations
 5. reject chains invalidated by revocation
+
+## Relying-Party Integration Profiles
+
+The protocol is intended to support a small number of narrow, repeatable
+integration patterns.
+
+### Profile 1: Artifact Verification
+
+A relying party receives CBIO proof material from an agent, validates it
+locally, and then maps the verified agent identity into its own account or
+policy model.
+
+Typical result:
+
+- create a new site account for the agent
+- link the agent identity to an existing account
+- assign a trust tier or capability set
+
+### Profile 2: Online Verification
+
+A relying party sends proof material to a CBIO verification service or trusted
+adapter, then consumes the verification result in its own auth flow.
+
+Typical result:
+
+- trust a verification response
+- create or update local identity linkage
+- continue using existing sessions or tokens
+
+### Profile 3: Signed Request Plus Identity Context
+
+A relying party validates a CBIO identity chain and separately evaluates a
+signed request or related request metadata.
+
+Typical result:
+
+- accept a request from a known agent identity
+- apply site-defined authorization and abuse controls
+
+These profiles are additive. None of them require a site to replace its
+existing auth provider or authorization model.
+
+## Artifact And Lifecycle Expectations
+
+Any transport-level proof artifact built on this protocol should make the
+following operational details explicit:
+
+- what protocol version it relies on
+- what identity or authority chain it asserts
+- when it was issued
+- when it expires, if expiration exists
+- whether a relying party is expected to perform online revalidation
+- how revocation affects the artifact's trust status
+
+The protocol core defines identity and governance semantics first. Transport
+artifacts and service-specific envelopes may evolve on top of that core, but
+they should preserve these expectations.
+
+## Stability And Conformance
+
+The protocol is only useful as a shared trust substrate if independent
+implementations can reach the same verification result.
+
+For that reason:
+
+- canonical object shapes must remain explicit
+- signature inputs must remain deterministic
+- versioning must distinguish stable from experimental behavior
+- conformance tests and test vectors should be treated as part of the protocol surface
+
+If a behavior is not clearly defined enough for another implementation to
+reproduce, it is not yet mature enough to be treated as a stable protocol fact.
 
 ## References
 
