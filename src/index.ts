@@ -3,7 +3,8 @@
  * Pure math layer. Zero dependency on CbioAgent, vault, or errors.
  */
 
-export { deriveRootAgentId } from './identity.js';
+export { deriveRootAgentId, createIdentity } from './identity.js';
+export type { RootAgentIdentity } from './identity.js';
 export {
     generateNonce,
     signPayload,
