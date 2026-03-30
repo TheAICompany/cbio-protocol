@@ -21,23 +21,14 @@ Le protocole ne définit pas le stockage d'exécution, les flux CLI, les préfix
 ```ts
 import {
   deriveRootAgentId,
-  generateIdentityKeys,
-  derivePublicKey,
+  createIdentity,
+  generateNonce,
   signPayload,
   verifySignature,
-  createIdentityRef,
-  createAuthorityIdentity,
-  canonicalizeGovernanceObjectForSigning,
-  signIssuedAgentIdentity,
-  signDelegationCertificate,
-  signRevocationRecord,
-  verifyGovernanceIdentityRef,
-  verifyAuthorityIdentity,
-  verifyIssuedAgentIdentity,
-  verifyDelegationCertificate,
-  verifyRevocationRecord,
-  verifyAuthorityChain,
+  generateIdentityKeys,
+  derivePublicKey,
 } from '@the-ai-company/agent-identity-sdk/protocol';
+
 ```
 
 Les helpers de blob scellé pour la portabilité du vault sont dans `@the-ai-company/agent-identity-sdk/migration`, pas dans le module protocole.

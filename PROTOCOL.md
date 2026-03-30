@@ -64,23 +64,14 @@ It is not a universal replacement for mainstream application auth systems.
 ```ts
 import {
   deriveRootAgentId,
-  generateIdentityKeys,
-  derivePublicKey,
+  createIdentity,
+  generateNonce,
   signPayload,
   verifySignature,
-  createIdentityRef,
-  createAuthorityIdentity,
-  canonicalizeGovernanceObjectForSigning,
-  signIssuedAgentIdentity,
-  signDelegationCertificate,
-  signRevocationRecord,
-  verifyGovernanceIdentityRef,
-  verifyAuthorityIdentity,
-  verifyIssuedAgentIdentity,
-  verifyDelegationCertificate,
-  verifyRevocationRecord,
-  verifyAuthorityChain,
+  generateIdentityKeys,
+  derivePublicKey,
 } from '@the-ai-company/agent-identity-sdk/protocol';
+
 ```
 
 Sealed blob helpers for vault portability live in

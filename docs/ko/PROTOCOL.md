@@ -21,23 +21,14 @@ Claw-biometric (c-bio)는 거버넌스된 에이전트 ID 프로토콜입니다.
 ```ts
 import {
   deriveRootAgentId,
-  generateIdentityKeys,
-  derivePublicKey,
+  createIdentity,
+  generateNonce,
   signPayload,
   verifySignature,
-  createIdentityRef,
-  createAuthorityIdentity,
-  canonicalizeGovernanceObjectForSigning,
-  signIssuedAgentIdentity,
-  signDelegationCertificate,
-  signRevocationRecord,
-  verifyGovernanceIdentityRef,
-  verifyAuthorityIdentity,
-  verifyIssuedAgentIdentity,
-  verifyDelegationCertificate,
-  verifyRevocationRecord,
-  verifyAuthorityChain,
+  generateIdentityKeys,
+  derivePublicKey,
 } from '@the-ai-company/agent-identity-sdk/protocol';
+
 ```
 
 vault 이식성용 sealed blob 헬퍼는 `@the-ai-company/agent-identity-sdk/migration`에 있으며, 프로토콜 모듈에 포함되지 않습니다.

@@ -21,23 +21,14 @@ El protocolo no define almacenamiento en tiempo de ejecución, flujos CLI, prefi
 ```ts
 import {
   deriveRootAgentId,
-  generateIdentityKeys,
-  derivePublicKey,
+  createIdentity,
+  generateNonce,
   signPayload,
   verifySignature,
-  createIdentityRef,
-  createAuthorityIdentity,
-  canonicalizeGovernanceObjectForSigning,
-  signIssuedAgentIdentity,
-  signDelegationCertificate,
-  signRevocationRecord,
-  verifyGovernanceIdentityRef,
-  verifyAuthorityIdentity,
-  verifyIssuedAgentIdentity,
-  verifyDelegationCertificate,
-  verifyRevocationRecord,
-  verifyAuthorityChain,
+  generateIdentityKeys,
+  derivePublicKey,
 } from '@the-ai-company/agent-identity-sdk/protocol';
+
 ```
 
 Los ayudantes de blob sellado para portabilidad del vault están en `@the-ai-company/agent-identity-sdk/migration`, no en el módulo de protocolo.
