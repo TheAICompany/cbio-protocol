@@ -1,21 +1,18 @@
 # CBIO 协议
 
-Claw-biometric (c-bio) 是一种受治理的代理身份协议。
+Claw-biometric (c-bio) — 规范说明与最小 TypeScript 原语实现。
 
-本仓库包含身份推导、治理对象和验证逻辑的规范与核心 Node.js (TypeScript) 实现。
+协议文档仅维护**英文**（仓库根目录 `PROTOCOL.md`）与**中文**（本目录）。
 
-## 目的
+## 文档
 
-本协议以身份为首要原则：
-- 每个代理都是一等公民身份。
-- 治理关系（颁发、委派、撤销）对协议可见。
-- 系统旨在为自主代理提供安全、可验证的身份。
+- **规范正文（中文译本）：** [PROTOCOL.md](PROTOCOL.md)（与仓库根目录英文 `PROTOCOL.md` 对齐；若有冲突以英文规范为准，除非项目另有声明）
 
 ## 内容
 
-- [PROTOCOL.md](PROTOCOL.md): 完整协议规范。
-- [CAPABILITIES.md](CAPABILITIES.md): 能力与权限矩阵。
-- `src/`: 核心实现。
+- [PROTOCOL.md](PROTOCOL.md)：协议规范。
+- [CAPABILITIES.md](CAPABILITIES.md)：能力与权限矩阵。
+- `src/`：核心实现。
 
 ## 开发
 
