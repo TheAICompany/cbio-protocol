@@ -13,21 +13,22 @@ function generateIdentityKeys() {
 }
 
 // --- Logic from src/identity.ts ---
-const ROOT_AGENT_ID_PREFIX = 'agt_';
+const SUBJECT_ID_PREFIX = 'sub_';
 
-function deriveRootAgentId(rootPublicKey) {
-    const rawKey = Buffer.from(rootPublicKey, 'base64url');
+function deriveSubjectId(publicKey) {
+    const rawKey = Buffer.from(publicKey, 'base64url');
     const hash = crypto.createHash('sha256').update(rawKey).digest('base64url');
-    return ROOT_AGENT_ID_PREFIX + hash;
+    return SUBJECT_ID_PREFIX + hash;
 }
 
 function createIdentity() {
     const { privateKey, publicKey } = generateIdentityKeys();
-    const identityId = deriveRootAgentId(publicKey);
+    const subjectId = deriveSubjectId(publicKey);
     return {
         privateKey,
         publicKey,
-        identityId,
+        subjectId,
+        keyVersion: 1,
     };
 }
 
@@ -37,16 +38,16 @@ try {
     const identity = createIdentity();
     console.log('Result:', identity);
     
-    if (!identity.privateKey || !identity.publicKey || !identity.identityId) {
+    if (!identity.privateKey || !identity.publicKey || !identity.subjectId) {
         throw new Error('Missing fields');
     }
     
-    if (!identity.identityId.startsWith('agt_')) {
+    if (!identity.subjectId.startsWith('sub_')) {
         throw new Error('Invalid prefix');
     }
     
-    const secondDerivation = deriveRootAgentId(identity.publicKey);
-    if (secondDerivation !== identity.identityId) {
+    const secondDerivation = deriveSubjectId(identity.publicKey);
+    if (secondDerivation !== identity.subjectId) {
         throw new Error('Derivation mismatch');
     }
     

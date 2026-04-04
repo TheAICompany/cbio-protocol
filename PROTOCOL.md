@@ -5,186 +5,175 @@ Normative specification for Claw-biometric (c-bio).
 If any document in this repository conflicts with this file on protocol shape or
 verification semantics, this file is the source of truth.
 
-This specification defines cryptographic primitives, `agent_id` derivation,
-schemas for signed objects, canonical serialization, and verification steps. It
-does not define runtime storage, CLI flows, secret-name prefixes, SDK
-ergonomics, or application policy.
+CBIO defines a unified identity protocol for both humans and agents. A relying
+party recognizes one stable subject identifier format. Labels such as
+`species` or `kind` are descriptive metadata only; they do not create separate
+identity systems.
 
-## Non-goals (normative boundary)
+The protocol answers three questions:
 
-This specification does not define:
+1. who are you
+2. have you authenticated recently
+3. did you sign this exact request
 
-- relying-party account registration or authorization logic
-- site sessions or token issuance
-- billing, abuse prevention, or product policy systems
-- replacement of OAuth, OIDC, JWT, API keys, or hosted authentication products
+These questions are represented as three protocol layers:
 
-Implementations produce verifiable bindings between keys, identifiers, and
-signed objects. Relying parties decide how to use verification outcomes.
+- stable identity
+- time-bounded session JWT
+- single-request proof
 
-How verification outcomes are composed with OAuth, OIDC, site sessions, or
-hosted identity products is an integration concern **outside** this specification.
+Stable identity may additionally include an optional parent link so a subject
+can be traced upward to an earlier subject. This supports identity provenance,
+not authorization.
 
-## Canonical Entry Point
+Authorization remains a local decision of the receiving system.
 
-```ts
-import {
-  deriveRootAgentId,
-  createIdentity,
-  generateNonce,
-  signPayload,
-  verifySignature,
-  generateIdentityKeys,
-  derivePublicKey,
-} from '@the-ai-company/agent-identity-sdk/protocol';
-
-```
-
-Sealed blob helpers for vault portability live in
-`@the-ai-company/agent-identity-sdk/migration`, not in the protocol module.
-
-## Authority tree (data model)
-
-Signed chain objects in this specification assume a directed tree:
-
-- Exactly one root per chain: an authority with no issuer parent in that chain.
-- Child agents are bound to a parent authority via signed objects defined below.
-
-Unless extended by a future version, implementations MUST treat the model as a
-tree, not an arbitrary graph.
-
-## Base Primitives
+## Cryptographic Primitives
 
 The following are normative:
 
-- `generateIdentityKeys()`
-- `derivePublicKey(privateKey)`
-- `signPayload(privateKey, payload)`
-- `verifySignature(publicKey, signature, payload)`
-- `deriveRootAgentId(publicKey)`
+- generation of a new Ed25519 keypair
+- derivation of a public key from a private key
+- generation of a detached Ed25519 signature over a payload
+- verification of a detached Ed25519 signature against a payload
+- deterministic derivation of `subject_id` from a public key
 
-They are necessary but not sufficient for full chain verification.
+### Subject identifier (`subject_id`)
 
-### Agent identifier (`agent_id`)
+`subject_id` is the canonical stable identifier for a protocol subject. It is
+derived deterministically from the subject public key and conventionally
+prefixed `sub_`. Distinct accepted public keys MUST map to distinct `subject_id`
+values under this derivation.
 
-`deriveRootAgentId(publicKey)` yields `agent_id`, the canonical string identifier
-for a root agent (conventionally prefixed `agt_`). It is derived deterministically
-from the root public key. Distinct accepted public keys MUST map to distinct
-`agent_id` values under this derivation. Implementations MUST NOT substitute
-local storage paths or ad hoc string prefixes for `agent_id`.
+Derivation procedure:
 
-## Canonical Objects
+1. decode the public key bytes
+2. compute the SHA-256 hash of those bytes
+3. encode the hash using base64url without padding
+4. prepend the literal prefix `sub_`
 
-### AuthorityIdentity
+## Layer 1: Stable Identity
 
-```ts
-interface AuthorityIdentity {
-  cbio_protocol: 'v1.0';
-  kind: 'authority_identity';
-  authority: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-}
-```
+### Object: `IdentityDescriptor`
 
-`AuthorityIdentity` identifies an origin authority.
+Required fields:
 
-It is not an issuance result. It has no parent object and no parent signature.
-Its role in the protocol is to identify the root from which an authority tree
-begins.
+- `cbio_protocol`: string, fixed value `v1.0`
+- `kind`: string, fixed value `identity_descriptor`
+- `subject`: object
+- `subject.subject_id`: string
+- `subject.public_key`: string
+- `subject.key_version`: integer
 
-### IssuedAgentIdentity
+Optional fields:
 
-```ts
-interface IssuedAgentIdentity {
-  cbio_protocol: 'v1.0';
-  kind: 'issued_agent_identity';
-  agent: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-  authority: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-  issuance: {
-    issued_at: string;
-    expires_at?: string;
-    sequence: number;
-  };
-  capabilities?: string[];
-  metadata?: Record<string, string>;
-  authority_signature: string;
-}
-```
+- `subject.species`: string
+- `subject.kind_label`: string
+- `subject.parent`: object
+- `subject.parent.subject_id`: string
+- `subject.parent.public_key`: string
+- `subject.parent.key_version`: integer
+- `subject.parent_signature`: string
+- `subject.metadata`: object whose keys and values are strings
 
-### DelegationCertificate
+`IdentityDescriptor` binds a stable identifier to a public key. It answers only
+the question "who is this subject".
 
-```ts
-interface DelegationCertificate {
-  cbio_protocol: 'v1.0';
-  kind: 'delegation_certificate';
-  issuer: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-  delegate: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-  delegation: {
-    issued_at: string;
-    expires_at?: string;
-    capabilities: string[];
-    constraints?: Record<string, string>;
-    sequence: number;
-  };
-  issuer_signature: string;
-}
-```
+Normative notes:
 
-### RevocationRecord
+- `species` and `kind_label` are descriptive labels only.
+- `subject.parent`, when present, declares the direct parent subject from which
+  this subject is derived for traceability purposes.
+- `subject.parent_signature`, when present, is a detached signature produced by
+  the parent subject over the unsigned `IdentityDescriptor` payload.
+- A relying party MUST NOT treat `species` or `kind_label` as an authorization
+  decision supplied by the protocol.
+- Human and agent subjects share the same identifier format and verification
+  rules.
+- Parent linkage provides provenance only. Acceptance of any ancestry chain
+  remains a local trust decision of the receiver.
 
-```ts
-interface RevocationRecord {
-  cbio_protocol: 'v1.0';
-  kind: 'revocation_record';
-  issuer: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-  target: {
-    kind: 'issued_agent_identity' | 'delegation_certificate';
-    subject_agent_id: string;
-    sequence: number;
-  };
-  revocation: {
-    revoked_at: string;
-    reason?: string;
-  };
-  issuer_signature: string;
-}
-```
+## Layer 2: Session JWT
 
-### AuthorityChain
+Layer 2 answers the question "has this subject authenticated recently".
 
-```ts
-interface AuthorityChain {
-  cbio_protocol: 'v1.0';
-  kind: 'authority_chain';
-  authority_root: AuthorityIdentity;
-  issued_agent: IssuedAgentIdentity;
-  delegations?: DelegationCertificate[];
-  revocations?: RevocationRecord[];
-}
-```
+The session token format for this layer is JWT. A valid CBIO session token MUST
+be a signed JWT carrying at least the following claims:
+
+- `iss`: string, issuer identifier
+- `sub`: string, the authenticated `subject_id`
+- `aud`: string or array of strings, intended audience
+- `iat`: number, issued-at time in seconds since Unix epoch
+- `exp`: number, expiration time in seconds since Unix epoch
+- `jti`: string, unique token identifier
+
+Optional claims:
+
+- `sid`: string, issuer-defined session identifier
+- `amr`: array of strings, authentication methods
+- `cbio_species`: string
+- `cbio_kind`: string
+- `cbio`: object for issuer-defined CBIO extension fields
+
+Normative notes:
+
+- The presence of a valid session JWT means the issuer asserts that the subject
+  authenticated recently enough for the token lifetime.
+- Session acceptance, renewal, revocation, storage, and local conversion into
+  cookies or framework sessions remain local concerns.
+- Claim names other than the registered JWT claims above are application
+  profile choices unless this specification later standardizes them.
+
+### Issuer Keys
+
+Session JWT verification depends on issuer key distribution.
+
+Minimum conventions:
+
+- `iss` identifies the JWT issuer
+- if the JWT header contains `kid`, verifiers SHOULD use it to select the
+  matching verification key
+- an issuer SHOULD publish its active verification keys as a JWKS
+- a verifier MAY obtain issuer keys by direct configuration or by fetching the
+  issuer JWKS
+
+This specification does not require a discovery protocol. It only requires that
+the verifier and issuer share a consistent mapping from `iss` and optional
+`kid` to the correct verification key.
+
+## Layer 3: Request Proof
+
+### Object: `RequestProof`
+
+Required fields:
+
+- `cbio_protocol`: string, fixed value `v1.0`
+- `kind`: string, fixed value `request_proof`
+- `subject`: object
+- `subject.subject_id`: string
+- `subject.public_key`: string
+- `subject.key_version`: integer
+- `request`: object
+- `request.action`: string
+- `request.issued_at`: string
+- `request.nonce`: string
+- `signature`: string
+
+Optional fields:
+
+- `request.resource`: string
+- `request.session_id`: string
+- `request.audience`: string
+- `request.metadata`: object whose keys and values are strings
+
+`RequestProof` answers the question "did this subject sign this exact request".
+
+Normative notes:
+
+- `action`, `resource`, `audience`, and `metadata` are opaque to the protocol.
+- A receiver interprets those fields under local rules.
+- `request.session_id`, when present, binds the request to a previously issued
+  session JWT without changing local authorization semantics.
 
 ## Canonical Serialization
 
@@ -193,79 +182,85 @@ serialization.
 
 Rules:
 
-1. Remove the signature field before serialization.
-2. Serialize fields in canonical schema order.
-3. Omit fields that are `undefined`.
-4. Preserve array order exactly.
-5. Sort keys lexicographically for `metadata` and `constraints`.
-6. Encode as UTF-8 JSON with no insignificant whitespace.
+1. remove the signature field before serialization
+2. serialize fields in canonical schema order
+3. omit fields that are `undefined`
+4. preserve array order exactly
+5. sort keys lexicographically for metadata objects
+6. encode as UTF-8 JSON with no insignificant whitespace
 
-Use `canonicalizeGovernanceObjectForSigning(...)` to produce the payload.
+Only the resulting byte sequence is normative.
 
 ## Verification Model
 
-Verifiers validate key-to-identifier binding and, when present, signed chain
-objects. A verifier does not assign root status by policy; it checks that the
-declared root object matches the schema and has no issuer parent in the chain.
+Verifiers validate key-to-identifier binding, session JWT integrity, and
+request proof integrity.
 
-For each identity reference:
+For each embedded subject reference:
 
-1. derive agent id from public key
-2. compare to declared agent id
+1. derive `subject_id` from the public key
+2. compare it to the declared `subject_id`
 3. reject on mismatch
 
-For issued identities, delegations, and revocations:
+For an `IdentityDescriptor`:
 
-1. validate embedded identity references
+1. validate the embedded subject reference
+2. if `subject.parent` is present, validate the embedded parent subject
+   reference
+3. if `subject.parent` is present, canonicalize the unsigned payload and verify
+   `subject.parent_signature` using the declared parent public key
+4. if `subject.parent` is absent, no parent-link verification step applies
+
+For a session JWT:
+
+1. verify the JWT signature using issuer key material
+2. validate `iss`, `sub`, `aud`, `iat`, `exp`, and `jti`
+3. enforce the token validity interval using `iat` and `exp`
+4. treat `sub` as the authenticated `subject_id`
+
+For a `RequestProof`:
+
+1. validate the embedded subject reference
 2. canonicalize the unsigned payload
-3. verify the signature
-4. enforce time validity where applicable
+3. verify the subject signature
+4. check freshness inputs such as `issued_at` or `nonce` if the receiver
+   requires them
+5. if `request.session_id` is present, the receiver MAY require a valid matching
+   session JWT
 
-For authority chains:
+Successful verification means:
 
-1. validate root authority
-2. validate issued agent
-3. validate delegations
-4. validate revocations
-5. reject chains invalidated by revocation
+- the subject identity is internally consistent
+- the signed payload has not been tampered with
+- the relevant signer signed the exact payload presented
+- when a parent link is present, the declared parent signed the child identity
+  payload
 
-## Relying-party integration (patterns)
+Successful verification does not mean:
 
-The following are descriptive names for common deployments. They do not add
-requirements beyond the verification rules above.
+- the receiver must accept the subject
+- the receiver must accept the session
+- the receiver must accept the request
+- the receiver must trust the declared parent chain
+- the subject is authorized to perform any action under receiver policy
 
-### Profile 1: Artifact verification
+## Artifact and Lifecycle Expectations
 
-The relying party validates proof material locally, then uses the result in its
-own account or policy store.
+Transport envelopes SHOULD expose protocol version, object kind, subject
+identity, signed payload, signature, and relevant timestamps.
 
-### Profile 2: Online verification
+Replay windows, nonce retention, session storage, JWT issuance, rate limits,
+quotas, and allow/deny policy are outside this specification.
 
-The relying party obtains a verification result from a service, then continues
-its own authentication flow.
-
-### Profile 3: Signed request with identity context
-
-The relying party validates chain objects separately from request signing.
-
-## Artifact and lifecycle expectations
-
-Transport envelopes SHOULD expose: protocol version; asserted identities or
-chain; issuance time; optional expiry; whether online revalidation is expected;
-effect of revocation.
-
-## Stability and conformance
+## Stability and Conformance
 
 Independent implementations MUST be able to reach the same verification result
 for the same inputs. Therefore:
 
-- canonical object shapes and signature inputs remain explicit and versioned
-- conformance tests and test vectors are part of the protocol surface
+- object shapes and signature inputs must remain explicit and versioned
+- `species`, `kind_label`, action names, audience values, and metadata are
+  opaque bytes for protocol purposes
+- conformance tests and test vectors belong to the protocol surface
 
-If a behavior is not specified precisely enough to reproduce across
-implementations, it is not yet a stable protocol fact.
-
-## References
-
-- `src/identity.ts`
-- `src/crypto.ts`
+If a behavior is not specified precisely enough for independent reproduction, it
+is not yet a stable protocol fact.

@@ -1,196 +1,230 @@
 # Claw-biometric 协议
 
-Claw-biometric (c-bio) 的**规范性**说明。
+Claw-biometric (c-bio) 的规范性说明。
 
 若本仓库中其他文档与此文件在协议形态或验证语义上存在冲突，以本文件为准。
 
-本规范定义密码学原语、`agent_id` 推导、有签名对象的 schema、规范序列化及验证步骤。不定义运行时存储、CLI、密钥前缀、SDK 人机工程或应用策略。
+CBIO 定义了一套同时覆盖 human 与 agent 的统一身份协议。依赖方只识别一种稳定主体标识格式。`species` 与 `kind` 一类字段只是描述性标签，不构成独立身份体系。
 
-## 非目标（规范边界）
+协议只回答三件事：
 
-本规范不定义：
+1. 你是谁
+2. 你最近是否完成认证
+3. 这条请求是不是你签的
 
-- 依赖方账户注册或授权逻辑
-- 站点会话或令牌签发
-- 计费、滥用治理或产品策略系统
-- 以 CBIO 替代 OAuth、OIDC、JWT、API 密钥或托管认证产品
+这三件事对应三层协议对象：
 
-实现产生密钥、标识符与有签名对象之间可验证的绑定；依赖方自行决定如何使用验证结果。
+- 长期稳定身份
+- 有时效的 session JWT
+- 单次请求 proof
 
-验证结果如何与 OAuth、OIDC、站点会话或托管身份产品组合，属于**本规范范围之外**的集成问题。
+长期身份还可以带一个可选的 `parent` 链接，用来把主体向上追溯到更早的主体。这解决的是身份来源问题，不是授权问题。
 
-## 规范入口点
+授权始终由接收方本地决定。
 
-```ts
-import {
-  deriveRootAgentId,
-  createIdentity,
-  generateNonce,
-  signPayload,
-  verifySignature,
-  generateIdentityKeys,
-  derivePublicKey,
-} from '@the-ai-company/agent-identity-sdk/protocol';
-
-```
-
-保险库可移植的密封 blob 辅助函数位于 `@the-ai-company/agent-identity-sdk/migration`，不在协议模块中。
-
-## 权威树（数据模型）
-
-本规范中的有签名链对象假定有向树：
-
-- 每条链恰有一个根：在该链中没有签发方父节点的权威。
-- 子代理通过下文定义的有签名对象与父权威绑定。
-
-除非未来版本扩展，实现**必须**将模型视为树，而非任意图。
-
-## 基础原语
+## 密码学原语
 
 以下为规范性原语：
 
-- `generateIdentityKeys()`
-- `derivePublicKey(privateKey)`
-- `signPayload(privateKey, payload)`
-- `verifySignature(publicKey, signature, payload)`
-- `deriveRootAgentId(publicKey)`
+- 生成新的 Ed25519 密钥对
+- 由私钥推导公钥
+- 对载荷生成 Ed25519 分离签名
+- 针对载荷验证 Ed25519 分离签名
+- 由公钥确定性推导 `subject_id`
 
-它们对完整链验证是必要但不充分的。
+### 主体标识符（`subject_id`）
 
-### 代理标识符（`agent_id`）
+`subject_id` 是协议主体的规范性稳定标识。它由主体公钥确定性推导，惯例前缀为 `sub_`。在可接受的公钥集合内，不同公钥必须映射到不同 `subject_id`。
 
-`deriveRootAgentId(publicKey)` 得到 `agent_id`，即根代理的规范性字符串标识（惯例前缀 `agt_`）。它由根公钥确定性推导。在可接受的公钥集合内，不同公钥**必须**映射到不同 `agent_id`。实现**不得**用本地存储路径或临时字符串前缀代替 `agent_id`。
+推导过程：
 
-## 规范对象
+1. 解码公钥字节
+2. 对这些字节计算 SHA-256
+3. 将哈希编码为不带 padding 的 base64url
+4. 在结果前拼接字面量前缀 `sub_`
 
-### AuthorityIdentity
+## 第一层：长期稳定身份
 
-```ts
-interface AuthorityIdentity {
-  cbio_protocol: 'v1.0';
-  kind: 'authority_identity';
-  authority: {
-    agent_id: string;
-    public_key: string;
-    key_version: number;
-  };
-}
-```
+### 对象：`IdentityDescriptor`
 
-`AuthorityIdentity` 标识起源权威。它不是颁发结果，无父对象与父签名。其在协议中的作用是指明权威树的根。
+必填字段：
 
-### IssuedAgentIdentity
+- `cbio_protocol`：字符串，固定值 `v1.0`
+- `kind`：字符串，固定值 `identity_descriptor`
+- `subject`：对象
+- `subject.subject_id`：字符串
+- `subject.public_key`：字符串
+- `subject.key_version`：整数
 
-```ts
-interface IssuedAgentIdentity {
-  cbio_protocol: 'v1.0';
-  kind: 'issued_agent_identity';
-  agent: { agent_id: string; public_key: string; key_version: number };
-  authority: { agent_id: string; public_key: string; key_version: number };
-  issuance: { issued_at: string; expires_at?: string; sequence: number };
-  capabilities?: string[];
-  metadata?: Record<string, string>;
-  authority_signature: string;
-}
-```
+可选字段：
 
-### DelegationCertificate
+- `subject.species`：字符串
+- `subject.kind_label`：字符串
+- `subject.parent`：对象
+- `subject.parent.subject_id`：字符串
+- `subject.parent.public_key`：字符串
+- `subject.parent.key_version`：整数
+- `subject.parent_signature`：字符串
+- `subject.metadata`：对象，键和值均为字符串
 
-```ts
-interface DelegationCertificate {
-  cbio_protocol: 'v1.0';
-  kind: 'delegation_certificate';
-  issuer: { agent_id: string; public_key: string; key_version: number };
-  delegate: { agent_id: string; public_key: string; key_version: number };
-  delegation: {
-    issued_at: string;
-    expires_at?: string;
-    capabilities: string[];
-    constraints?: Record<string, string>;
-    sequence: number;
-  };
-  issuer_signature: string;
-}
-```
+`IdentityDescriptor` 将稳定标识绑定到公钥。它只回答“这个主体是谁”。
 
-### RevocationRecord
+规范性说明：
 
-```ts
-interface RevocationRecord {
-  cbio_protocol: 'v1.0';
-  kind: 'revocation_record';
-  issuer: { agent_id: string; public_key: string; key_version: number };
-  target: {
-    kind: 'issued_agent_identity' | 'delegation_certificate';
-    subject_agent_id: string;
-    sequence: number;
-  };
-  revocation: { revoked_at: string; reason?: string };
-  issuer_signature: string;
-}
-```
+- `species` 与 `kind_label` 只是描述性标签。
+- 若存在 `subject.parent`，它声明该主体直接来源于哪个上级主体，用于可追溯性。
+- 若存在 `subject.parent_signature`，它表示父主体对无签名 `IdentityDescriptor` 载荷产生的分离签名。
+- 依赖方不得把 `species` 或 `kind_label` 视为协议替它给出的授权结论。
+- human 与 agent 共用同一套标识格式与验证规则。
+- parent 链接只提供 provenance。是否接受某条 ancestry chain，始终由接收方自行决定。
 
-### AuthorityChain
+## 第二层：Session JWT
 
-```ts
-interface AuthorityChain {
-  cbio_protocol: 'v1.0';
-  kind: 'authority_chain';
-  authority_root: AuthorityIdentity;
-  issued_agent: IssuedAgentIdentity;
-  delegations?: DelegationCertificate[];
-  revocations?: RevocationRecord[];
-}
-```
+第二层回答“这个主体最近是否完成认证”。
+
+这一层的 session token 格式采用 JWT。一个有效的 CBIO session token 必须是一个已签名 JWT，且至少包含以下 claims：
+
+- `iss`：字符串，issuer 标识
+- `sub`：字符串，即已认证主体的 `subject_id`
+- `aud`：字符串或字符串数组，目标受众
+- `iat`：数字，签发时间（Unix 秒）
+- `exp`：数字，过期时间（Unix 秒）
+- `jti`：字符串，唯一 token 标识
+
+可选 claims：
+
+- `sid`：字符串，issuer 定义的 session 标识
+- `amr`：字符串数组，认证方法
+- `cbio_species`：字符串
+- `cbio_kind`：字符串
+- `cbio`：对象，用于 issuer 定义的 CBIO 扩展字段
+
+规范性说明：
+
+- 一个有效 session JWT 的含义是：issuer 断言该主体在此 token 生命周期内足够“近期”地完成了认证。
+- session 是否接受、如何续期、如何撤销、如何存储，以及如何转换成 cookie 或框架 session，均属于本地问题。
+- 除上述注册 JWT claims 之外，其他 claim 名在本规范后续标准化之前都属于应用 profile 选择。
+
+### Issuer Keys
+
+session JWT 的验证依赖 issuer 密钥分发。
+
+最小约定：
+
+- `iss` 用来标识 JWT issuer
+- 如果 JWT header 中带有 `kid`，验证方应当优先用它选择匹配的验证公钥
+- issuer 应当公开其当前有效验证公钥的 JWKS
+- 验证方可以通过静态配置取得 issuer 公钥，也可以拉取 issuer 的 JWKS
+
+本规范不强制规定 discovery 协议；它只要求验证方与 issuer 对 `iss` 以及可选的 `kid` 到验证公钥之间的映射保持一致。
+
+## 第三层：单次请求 Proof
+
+### 对象：`RequestProof`
+
+必填字段：
+
+- `cbio_protocol`：字符串，固定值 `v1.0`
+- `kind`：字符串，固定值 `request_proof`
+- `subject`：对象
+- `subject.subject_id`：字符串
+- `subject.public_key`：字符串
+- `subject.key_version`：整数
+- `request`：对象
+- `request.action`：字符串
+- `request.issued_at`：字符串
+- `request.nonce`：字符串
+- `signature`：字符串
+
+可选字段：
+
+- `request.resource`：字符串
+- `request.session_id`：字符串
+- `request.audience`：字符串
+- `request.metadata`：对象，键和值均为字符串
+
+`RequestProof` 回答“这条精确请求是不是由该主体签署”。
+
+规范性说明：
+
+- `action`、`resource`、`audience` 与 `metadata` 对协议而言都是透明字段。
+- 接收方按照自己的本地规则解释这些字段。
+- 若存在 `request.session_id`，它表示该请求绑定到某个已发出的 session JWT，但这不会改变本地授权语义。
 
 ## 规范序列化
 
 本规范定义的有签名对象对无签名载荷使用确定性序列化。
 
-规则：1. 序列化前移除签名字段；2. 按规范 schema 顺序序列化字段；3. 省略 `undefined` 字段；4. 严格保持数组顺序；5. `metadata` 与 `constraints` 的键按字典序排序；6. 以无多余空白的 UTF-8 JSON 编码。
+规则：
 
-使用 `canonicalizeGovernanceObjectForSigning(...)` 生成载荷。
+1. 序列化前移除签名字段
+2. 按规范 schema 顺序序列化字段
+3. 省略 `undefined` 字段
+4. 严格保持数组顺序
+5. 对 metadata 对象按键名字典序排序
+6. 以无多余空白的 UTF-8 JSON 编码
+
+规范性约束只在最终输出的字节序列。
 
 ## 验证模型
 
-验证方校验密钥与标识符的绑定，并在存在时校验有签名链对象。验证方不按策略「授予」根身份；其检查声明的根对象符合 schema 且在该链中无签发方父节点。
+验证方校验密钥与标识符的绑定、session JWT 的完整性，以及请求 proof 的完整性。
 
-对每个身份引用：1. 由公钥推导 agent id；2. 与声明的 agent id 比较；3. 不匹配则拒绝。
+对每个内嵌的主体引用：
 
-对已颁发身份、委派与撤销：1. 校验嵌入的身份引用；2. 规范化无签名载荷；3. 验证签名；4. 在适用处强制执行时间有效性。
+1. 由公钥推导 `subject_id`
+2. 与声明的 `subject_id` 比较
+3. 不匹配则拒绝
 
-对权威链：1. 验证根权威；2. 验证已颁发代理；3. 验证委派；4. 验证撤销；5. 拒绝已被撤销作废的链。
+对 `IdentityDescriptor`：
 
-## 依赖方集成（模式）
+1. 校验其中的主体引用
+2. 若存在 `subject.parent`，校验其中的父主体引用
+3. 若存在 `subject.parent`，规范化无签名载荷，并用声明的父公钥验证 `subject.parent_signature`
+4. 若不存在 `subject.parent`，则不存在 parent-link 校验步骤
 
-以下为常见部署的**描述性**名称，不在上文验证规则之外增加要求。
+对 session JWT：
 
-### 模式 1：工件验证
+1. 使用 issuer 的密钥材料验证 JWT 签名
+2. 校验 `iss`、`sub`、`aud`、`iat`、`exp` 与 `jti`
+3. 根据 `iat` 与 `exp` 强制检查 token 有效时间区间
+4. 将 `sub` 视为已认证主体的 `subject_id`
 
-依赖方在本地校验证明材料，再在自有账户或策略存储中使用结果。
+对 `RequestProof`：
 
-### 模式 2：在线验证
+1. 校验其中的主体引用
+2. 规范化无签名载荷
+3. 验证主体签名
+4. 若接收方需要，再检查 `issued_at`、`nonce` 等新鲜度输入
+5. 若存在 `request.session_id`，接收方可以要求存在一个匹配且有效的 session JWT
 
-依赖方从服务取得验证结果，再继续自有认证流程。
+验证成功只意味着：
 
-### 模式 3：带身份上下文的已签名请求
+- 主体身份内部一致
+- 已签名载荷未被篡改
+- 相关签名者签署了这份精确载荷
+- 若存在 parent 链接，则声明的父主体签署了这份子身份载荷
 
-依赖方将链对象校验与请求签名分开处理。
+验证成功不意味着：
+
+- 接收方必须接受该主体
+- 接收方必须接受该 session
+- 接收方必须接受该请求
+- 接收方必须信任声明出来的 parent chain
+- 该主体在接收方策略下拥有任何动作权限
 
 ## 工件与生命周期预期
 
-传输封装宜标明：协议版本；所断言的身份或链；签发时间；可选过期；是否期望在线再校验；撤销对信任状态的影响。
+传输封装宜标明协议版本、对象种类、主体标识、已签名载荷、签名与相关时间戳。
+
+重放窗口、nonce 保留、session 存储、JWT 签发、限流、配额与放行策略不属于本规范。
 
 ## 稳定性与一致性
 
-独立实现对相同输入须得到相同验证结果。因此：
+独立实现对相同输入必须得到相同验证结果。因此：
 
-- 规范对象形态与签名输入保持显式且带版本
+- 对象形态与签名输入必须保持显式且带版本
+- `species`、`kind_label`、动作名、audience 值与 metadata 对协议而言都只是透明字节
 - 一致性测试与测试向量属于协议表面
 
 若某行为未精确到可跨实现复现，则尚不构成稳定协议事实。
-
-## 参考
-
-- `src/identity.ts`
-- `src/crypto.ts`

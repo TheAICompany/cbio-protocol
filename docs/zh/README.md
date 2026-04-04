@@ -2,16 +2,19 @@
 
 Claw-biometric (c-bio) — 规范说明与最小 TypeScript 原语实现。
 
-协议文档仅维护**英文**（仓库根目录 `PROTOCOL.md`）与**中文**（本目录）。
+协议范围刻意保持很窄：
+
+- 证明是谁签了载荷
+- 保留对方签署的精确请求内容
+- 把允许/拒绝的决定留给接收方
 
 ## 文档
 
-- **规范正文（中文译本）：** [PROTOCOL.md](PROTOCOL.md)（与仓库根目录英文 `PROTOCOL.md` 对齐；若有冲突以英文规范为准，除非项目另有声明）
+- **规范正文（中文）：** [PROTOCOL.md](PROTOCOL.md)
 
 ## 内容
 
 - [PROTOCOL.md](PROTOCOL.md)：协议规范。
-- [CAPABILITIES.md](CAPABILITIES.md)：能力与权限矩阵。
 - `src/`：核心实现。
 
 ## 开发

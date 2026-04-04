@@ -1,33 +1,33 @@
 /**
  * Protocol primitives acceptance test.
- * Covers: deterministic root identity derivation.
+ * Covers: deterministic subject identity derivation.
  */
 
-import { generateIdentityKeys, deriveRootAgentId } from '../dist/index.js';
+import { generateIdentityKeys, deriveSubjectId } from '../dist/index.js';
 import assert from 'node:assert';
 
-async function testDeriveRootIdentity() {
-    console.log('--- 1. deriveRootAgentId ---');
+async function testDeriveSubjectIdentity() {
+    console.log('--- 1. deriveSubjectId ---');
     const keys = generateIdentityKeys();
     if (!keys.publicKey) throw new Error('Missing public key');
     
     console.log('Public Key (base64url):', keys.publicKey);
     
-    const rootId = deriveRootAgentId(keys.publicKey);
-    console.log('Derived Root Agent ID:', rootId);
+    const subjectId = deriveSubjectId(keys.publicKey);
+    console.log('Derived Subject ID:', subjectId);
     
-    assert.ok(rootId.startsWith('agt_'), 'root_agent_id must use agt_ prefix');
+    assert.ok(subjectId.startsWith('sub_'), 'subject_id must use sub_ prefix');
     
-    const rootIdAgain = deriveRootAgentId(keys.publicKey);
-    assert.strictEqual(rootId, rootIdAgain, 'root_agent_id derivation must be deterministic');
+    const subjectIdAgain = deriveSubjectId(keys.publicKey);
+    assert.strictEqual(subjectId, subjectIdAgain, 'subject_id derivation must be deterministic');
     
-    console.log('✅ deriveRootAgentId: deterministic and correctly prefixed');
+    console.log('✅ deriveSubjectId: deterministic and correctly prefixed');
 }
 
 async function run() {
     console.log('=== Protocol Primitives Acceptance ===');
     try {
-        await testDeriveRootIdentity();
+        await testDeriveSubjectIdentity();
         console.log('\n=== All protocol primitives passed ===');
     } catch (e) {
         console.error('❌', e);

@@ -8,15 +8,40 @@ Claw-biometric (c-bio) — normative spec and minimal TypeScript primitives.
 - **Normative specification (中文):** [`docs/zh/PROTOCOL.md`](docs/zh/PROTOCOL.md)
 
 This repository contains the canonical protocol specification and the core
-Node.js (TypeScript) implementation: identity derivation and cryptographic
-primitives (`src/`).
+Node.js (TypeScript) implementation for:
+
+- `subject_id` derivation from Ed25519 public keys
+- stable identity descriptors
+- issuer-signed session JWTs
+- subject-signed request proofs
+- the cryptographic primitives those objects rely on
+
+The protocol scope is intentionally narrow:
+
+- prove who signed a payload
+- preserve the exact payload they signed
+- leave all allow/deny decisions to the receiving system
 
 ## Contents
 
 - `PROTOCOL.md`: normative protocol specification.
-- `CAPABILITIES.md`: capability matrix (English); [`docs/zh/CAPABILITIES.md`](docs/zh/CAPABILITIES.md) (中文).
-- `docs/zh/`: Chinese README and protocol copy only.
+- `docs/zh/`: Chinese documentation.
 - `src/`: implementation.
+- `tests/`: protocol acceptance tests.
+
+## SDK Surface
+
+The package exposes the protocol-first SDK described by `PROTOCOL.md`, including:
+
+- `createIdentity()` and `deriveSubjectId()`
+- `createSubjectReference()`
+- `createIdentityDescriptor()` and `verifyIdentityDescriptor()`
+- `createSessionJwt()` for `EdDSA` or `RS256`, plus `decodeSessionJwtClaims()` and `verifySessionJwt()`
+- `createIssuerJwk()`, `createIssuerJwks()`, and `verifySessionJwtWithJwks()`
+- `createRequestProof()` and `verifyRequestProof()`
+- `serializeIdentityDescriptorPayload()`
+- `serializeRequestProofPayload()`
+- `generateIdentityKeys()`, `derivePublicKey()`, `signPayload()`, `verifySignature()`, `generateNonce()`
 
 ## Development
 
