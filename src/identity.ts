@@ -120,9 +120,12 @@ export interface VerifySessionJwtOptions {
 }
 
 export interface CreateIssuerJwkOptions {
-    publicKey: string;
     algorithm: 'EdDSA' | 'RS256';
     keyId: string;
+    publicKey?: string;
+    x?: string;
+    n?: string;
+    e?: string;
 }
 
 export interface VerifySessionJwtWithJwksOptions {
@@ -410,7 +413,11 @@ export async function createSessionJwt(options: CreateSessionJwtOptions): Promis
 
     const algorithm = options.algorithm ?? 'EdDSA';
     const signer = algorithm === 'EdDSA'
-        ? createPrivateKeyFromBase64Url(options.issuerPrivateKey)
+        ? (
+            options.issuerPrivateKey.includes('-----BEGIN')
+                ? await importPKCS8(options.issuerPrivateKey, algorithm)
+                : createPrivateKeyFromBase64Url(options.issuerPrivateKey)
+        )
         : await importPKCS8(options.issuerPrivateKey, algorithm);
     const payload = new SignJWT({
         sid: options.sessionId,
@@ -466,10 +473,22 @@ export async function verifySessionJwt(token: string, options: VerifySessionJwtO
 }
 
 export async function createIssuerJwk(options: CreateIssuerJwkOptions): Promise<IssuerJwk> {
-    const verificationKey = await createVerificationKey(options.publicKey, options.algorithm);
-    const jwk = await exportJWK(verificationKey);
-
     if (options.algorithm === 'EdDSA') {
+        if (options.x) {
+            return {
+                kid: options.keyId,
+                alg: 'EdDSA',
+                use: 'sig',
+                kty: 'OKP',
+                crv: 'Ed25519',
+                x: options.x,
+            };
+        }
+        if (!options.publicKey) {
+            throw new TypeError('publicKey or x is required for EdDSA issuer JWK creation');
+        }
+        const verificationKey = await createVerificationKey(options.publicKey, options.algorithm);
+        const jwk = await exportJWK(verificationKey);
         if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || typeof jwk.x !== 'string') {
             throw new TypeError('Failed to derive EdDSA JWK fields from public key');
         }
@@ -483,6 +502,21 @@ export async function createIssuerJwk(options: CreateIssuerJwkOptions): Promise<
         };
     }
 
+    if (options.n && options.e) {
+        return {
+            kid: options.keyId,
+            alg: 'RS256',
+            use: 'sig',
+            kty: 'RSA',
+            n: options.n,
+            e: options.e,
+        };
+    }
+    if (!options.publicKey) {
+        throw new TypeError('publicKey or n/e is required for RS256 issuer JWK creation');
+    }
+    const verificationKey = await createVerificationKey(options.publicKey, options.algorithm);
+    const jwk = await exportJWK(verificationKey);
     if (jwk.kty !== 'RSA' || typeof jwk.n !== 'string' || typeof jwk.e !== 'string') {
         throw new TypeError('Failed to derive RS256 JWK fields from public key');
     }

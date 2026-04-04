@@ -122,9 +122,9 @@ async function testProtocolObjects() {
     );
 
     const eddsaJwk = await createIssuerJwk({
-        publicKey: issuerKeys.publicKey,
         algorithm: 'EdDSA',
         keyId: 'kid_eddsa_v1',
+        publicKey: issuerKeys.publicKey,
     });
     assert.strictEqual(eddsaJwk.kid, 'kid_eddsa_v1');
     assert.strictEqual(eddsaJwk.alg, 'EdDSA');
