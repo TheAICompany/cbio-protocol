@@ -1,6 +1,6 @@
 {
   "name": "@the-ai-company/cbio-protocol",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Claw-biometric Protocol: subject identity, session JWT, and request proof primitives",
   "type": "module",
   "main": "./dist/index.js",
