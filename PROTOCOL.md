@@ -36,21 +36,38 @@ The following are normative:
 - derivation of a public key from a private key
 - generation of a detached Ed25519 signature over a payload
 - verification of a detached Ed25519 signature against a payload
-- deterministic derivation of `subject_id` from a public key
 
-### Subject identifier (`subject_id`)
+For `IdentityDescriptor` and `RequestProof`, `public_key` denotes the subject
+verification key encoded as base64url over SPKI DER bytes.
 
-`subject_id` is the canonical stable identifier for a protocol subject. It is
-derived deterministically from the subject public key and conventionally
-prefixed `sub_`. Distinct accepted public keys MUST map to distinct `subject_id`
-values under this derivation.
+### Subject Reference (`subject_ref`)
 
-Derivation procedure:
+`subject_ref` is the self-describing exchange form of a subject public key.
 
-1. decode the public key bytes
-2. compute the SHA-256 hash of those bytes
-3. encode the hash using base64url without padding
-4. prepend the literal prefix `sub_`
+Version `v1` uses the following string format:
+
+```text
+cbio:v1:sub:ed25519:spki-b64u:<key>
+```
+
+Where:
+
+- `cbio` is the fixed protocol prefix
+- `v1` is the protocol version
+- `sub` identifies the subject reference type
+- `ed25519` is the key algorithm
+- `spki-b64u` is the key encoding
+- `<key>` is the subject public key encoded as base64url over SPKI DER bytes
+
+Normative notes:
+
+- `subject_ref` is a portable wrapper around `public_key`, not a separate
+  identity system.
+- A verifier that understands `subject_ref` MUST be able to recover the exact
+  `public_key` value from it.
+- A protocol object MAY carry `public_key`, `subject_ref`, or both, as long as
+  the representation used is sufficient for verification and any duplicated
+  values are consistent.
 
 ## Layer 1: Stable Identity
 
@@ -61,18 +78,16 @@ Required fields:
 - `cbio_protocol`: string, fixed value `v1.0`
 - `kind`: string, fixed value `identity_descriptor`
 - `subject`: object
-- `subject.subject_id`: string
 - `subject.public_key`: string
-- `subject.key_version`: integer
 
 Optional fields:
 
+- `subject.subject_ref`: string
 - `subject.species`: string
 - `subject.kind_label`: string
 - `subject.parent`: object
-- `subject.parent.subject_id`: string
+- `subject.parent.subject_ref`: string
 - `subject.parent.public_key`: string
-- `subject.parent.key_version`: integer
 - `subject.parent_signature`: string
 - `subject.metadata`: object whose keys and values are strings
 
@@ -82,8 +97,12 @@ the question "who is this subject".
 Normative notes:
 
 - `species` and `kind_label` are descriptive labels only.
+- `subject.subject_ref`, when present, MUST decode to the same public key as
+  `subject.public_key`.
 - `subject.parent`, when present, declares the direct parent subject from which
   this subject is derived for traceability purposes.
+- `subject.parent.subject_ref`, when present, MUST decode to the same public key
+  as `subject.parent.public_key`.
 - `subject.parent_signature`, when present, is a detached signature produced by
   the parent subject over the unsigned `IdentityDescriptor` payload.
 - A relying party MUST NOT treat `species` or `kind_label` as an authorization
@@ -101,7 +120,7 @@ The session token format for this layer is JWT. A valid CBIO session token MUST
 be a signed JWT carrying at least the following claims:
 
 - `iss`: string, issuer identifier
-- `sub`: string, the authenticated `subject_id`
+- `sub`: string, the authenticated subject reference or subject public key
 - `aud`: string or array of strings, intended audience
 - `iat`: number, issued-at time in seconds since Unix epoch
 - `exp`: number, expiration time in seconds since Unix epoch
@@ -119,6 +138,9 @@ Normative notes:
 
 - The presence of a valid session JWT means the issuer asserts that the subject
   authenticated recently enough for the token lifetime.
+- `sub` SHOULD use `subject_ref` when the issuer wants a self-describing subject
+  string. A deployment MAY use raw `public_key` instead if both sides already
+  agree on the field semantics.
 - Session acceptance, renewal, revocation, storage, and local conversion into
   cookies or framework sessions remain local concerns.
 - Claim names other than the registered JWT claims above are application
@@ -136,6 +158,9 @@ Minimum conventions:
 - an issuer SHOULD publish its active verification keys as a JWKS
 - a verifier MAY obtain issuer keys by direct configuration or by fetching the
   issuer JWKS
+- if a verifier is configured with a direct issuer public key instead of JWKS,
+  that key SHOULD be supplied in a format acceptable to the verifier runtime,
+  such as PEM/SPKI text for RSA or base64url SPKI DER for Ed25519
 
 This specification does not require a discovery protocol. It only requires that
 the verifier and issuer share a consistent mapping from `iss` and optional
@@ -150,9 +175,7 @@ Required fields:
 - `cbio_protocol`: string, fixed value `v1.0`
 - `kind`: string, fixed value `request_proof`
 - `subject`: object
-- `subject.subject_id`: string
 - `subject.public_key`: string
-- `subject.key_version`: integer
 - `request`: object
 - `request.action`: string
 - `request.issued_at`: string
@@ -161,6 +184,7 @@ Required fields:
 
 Optional fields:
 
+- `subject.subject_ref`: string
 - `request.resource`: string
 - `request.session_id`: string
 - `request.audience`: string
@@ -171,6 +195,8 @@ Optional fields:
 Normative notes:
 
 - `action`, `resource`, `audience`, and `metadata` are opaque to the protocol.
+- `subject.subject_ref`, when present, MUST decode to the same public key as
+  `subject.public_key`.
 - A receiver interprets those fields under local rules.
 - `request.session_id`, when present, binds the request to a previously issued
   session JWT without changing local authorization semantics.
@@ -198,9 +224,11 @@ request proof integrity.
 
 For each embedded subject reference:
 
-1. derive `subject_id` from the public key
-2. compare it to the declared `subject_id`
-3. reject on mismatch
+1. validate that `public_key` is syntactically well-formed key material
+2. if `subject_ref` is present, parse it and compare the embedded key material
+   to `public_key`
+3. validate the declared subject key material
+4. reject on mismatch or invalid encoding
 
 For an `IdentityDescriptor`:
 
@@ -216,7 +244,9 @@ For a session JWT:
 1. verify the JWT signature using issuer key material
 2. validate `iss`, `sub`, `aud`, `iat`, `exp`, and `jti`
 3. enforce the token validity interval using `iat` and `exp`
-4. treat `sub` as the authenticated `subject_id`
+4. if `sub` is a `subject_ref`, parse it and recover the authenticated public
+   key
+5. otherwise treat `sub` as the authenticated subject public key
 
 For a `RequestProof`:
 

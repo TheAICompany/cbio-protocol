@@ -1,15 +1,11 @@
 /**
- * Protocol crypto primitives. Pure math layer.
- * Zero dependency on errors, vault, or runtime. Node crypto + buffer only.
+ * Protocol crypto primitives for the Node reference SDK.
+ * Zero dependency on app-specific layers. Node crypto + buffer only.
  */
 
 import { generateKeyPairSync, sign, verify, randomBytes, createPrivateKey, createPublicKey } from 'node:crypto';
 import { Buffer } from 'node:buffer';
-
-export interface KeyPair {
-    publicKey?: string;
-    privateKey: string;
-}
+import type { KeyPair } from './types.js';
 
 export function generateIdentityKeys(): KeyPair {
     const { publicKey, privateKey } = generateKeyPairSync('ed25519', {

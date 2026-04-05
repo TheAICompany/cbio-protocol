@@ -1,5 +1,9 @@
 import * as crypto from 'node:crypto';
 
+function createSubjectRef(publicKey) {
+    return `cbio:v1:sub:ed25519:spki-b64u:${publicKey}`;
+}
+
 // --- Logic from src/crypto.ts ---
 function generateIdentityKeys() {
     const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519', {
@@ -12,23 +16,12 @@ function generateIdentityKeys() {
     };
 }
 
-// --- Logic from src/identity.ts ---
-const SUBJECT_ID_PREFIX = 'sub_';
-
-function deriveSubjectId(publicKey) {
-    const rawKey = Buffer.from(publicKey, 'base64url');
-    const hash = crypto.createHash('sha256').update(rawKey).digest('base64url');
-    return SUBJECT_ID_PREFIX + hash;
-}
-
 function createIdentity() {
     const { privateKey, publicKey } = generateIdentityKeys();
-    const subjectId = deriveSubjectId(publicKey);
     return {
         privateKey,
         publicKey,
-        subjectId,
-        keyVersion: 1,
+        subjectRef: createSubjectRef(publicKey),
     };
 }
 
@@ -38,17 +31,8 @@ try {
     const identity = createIdentity();
     console.log('Result:', identity);
     
-    if (!identity.privateKey || !identity.publicKey || !identity.subjectId) {
+    if (!identity.privateKey || !identity.publicKey || !identity.subjectRef) {
         throw new Error('Missing fields');
-    }
-    
-    if (!identity.subjectId.startsWith('sub_')) {
-        throw new Error('Invalid prefix');
-    }
-    
-    const secondDerivation = deriveSubjectId(identity.publicKey);
-    if (secondDerivation !== identity.subjectId) {
-        throw new Error('Derivation mismatch');
     }
     
     console.log('✅ Standalone verification passed!');

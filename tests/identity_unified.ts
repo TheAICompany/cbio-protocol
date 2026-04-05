@@ -5,7 +5,7 @@
 
 import {
     createIdentity,
-    deriveSubjectId,
+    createSubjectRef,
     createSubjectReference,
     createIdentityDescriptor,
     verifyIdentityDescriptor,
@@ -18,10 +18,13 @@ import {
     createRequestProof,
     verifyRequestProof,
     generateIdentityKeys,
+    isValidSubjectRef,
+    parseSubjectRef,
     serializeIdentityDescriptorPayload,
 } from '../src/index.js';
 import assert from 'node:assert';
 import { generateKeyPairSync } from 'node:crypto';
+import { SignJWT, importPKCS8 } from 'jose';
 
 async function testCreateIdentity() {
     console.log('--- 1. testCreateIdentity ---');
@@ -29,14 +32,11 @@ async function testCreateIdentity() {
     
     assert.ok(identity.privateKey, 'identity must have a privateKey');
     assert.ok(identity.publicKey, 'identity must have a publicKey');
-    assert.ok(identity.subjectId, 'identity must have a subjectId');
-    assert.strictEqual(identity.keyVersion, 1, 'identity must default keyVersion to 1');
+    assert.ok(identity.subjectRef, 'identity must have a subjectRef');
+    assert.ok(isValidSubjectRef(identity.subjectRef), 'subjectRef must be valid');
+    assert.strictEqual(parseSubjectRef(identity.subjectRef).publicKey, identity.publicKey, 'subjectRef must round-trip');
     
-    console.log('Subject ID:', identity.subjectId);
-    assert.ok(identity.subjectId.startsWith('sub_'), 'subjectId must use sub_ prefix');
-    
-    const derivedId = deriveSubjectId(identity.publicKey);
-    assert.strictEqual(identity.subjectId, derivedId, 'subjectId must match derivedId from publicKey');
+    console.log('Public Key:', identity.publicKey);
     
     console.log('✅ createIdentity: successful and consistent');
 }
@@ -44,8 +44,6 @@ async function testCreateIdentity() {
 async function testProtocolObjects() {
     console.log('--- 2. testProtocolObjects ---');
     const subject = createIdentity();
-    assert.ok(subject.subjectId.startsWith('sub_'), 'subjectId must use sub_ prefix');
-    assert.strictEqual(subject.subjectId, deriveSubjectId(subject.publicKey));
 
     const issuerKeys = generateIdentityKeys();
     const parent = createIdentity();
@@ -59,16 +57,16 @@ async function testProtocolObjects() {
     });
 
     assert.ok(verifyIdentityDescriptor(descriptor), 'identity descriptor should verify');
+    assert.strictEqual(descriptor.subject.subject_ref, createSubjectRef(subject.publicKey), 'descriptor should carry subject_ref');
     assert.match(
         serializeIdentityDescriptorPayload(descriptor),
         /"metadata":\{"a":"first","z":"last"\}/,
         'metadata must be serialized in lexical order',
     );
-
-    const issuerRef = createSubjectReference(issuerKeys.publicKey!);
     const sessionJwt = await createSessionJwt({
-        issuer: issuerRef.subject_id,
-        subjectId: subject.subjectId,
+        issuer: 'issuer.example',
+        subjectPublicKey: subject.publicKey,
+        subjectRef: subject.subjectRef,
         audience: 'api.example.com',
         issuedAt: 1_775_219_200,
         expiresAt: 1_775_222_800,
@@ -82,16 +80,17 @@ async function testProtocolObjects() {
     });
 
     const claims = decodeSessionJwtClaims(sessionJwt);
-    assert.strictEqual(claims.sub, subject.subjectId, 'session JWT should carry the subject_id');
-    assert.strictEqual(claims.iss, issuerRef.subject_id, 'session JWT should carry the issuer');
+    assert.strictEqual(claims.sub, subject.subjectRef, 'session JWT should carry the subject_ref');
+    assert.strictEqual(claims.iss, 'issuer.example', 'session JWT should carry the issuer');
 
     assert.ok(
         await verifySessionJwt(sessionJwt, {
             issuerPublicKey: issuerKeys.publicKey!,
             now: 1_775_221_000,
-            expectedIssuer: issuerRef.subject_id,
+            expectedIssuer: 'issuer.example',
             expectedAudience: 'api.example.com',
-            expectedSubjectId: subject.subjectId,
+            expectedSubjectPublicKey: subject.publicKey,
+            expectedSubjectRef: subject.subjectRef,
             allowedAlgorithms: ['EdDSA'],
         }),
         'session JWT should verify inside validity window',
@@ -117,6 +116,7 @@ async function testProtocolObjects() {
         }),
         'request proof should verify within age limit',
     );
+    assert.strictEqual(proof.subject.subject_ref, subject.subjectRef, 'request proof should carry subject_ref');
 
     const rsaKeys = generateKeyPairSync('rsa', {
         modulusLength: 2048,
@@ -125,7 +125,8 @@ async function testProtocolObjects() {
     });
     const rs256Jwt = await createSessionJwt({
         issuer: 'issuer.example',
-        subjectId: subject.subjectId,
+        subjectPublicKey: subject.publicKey,
+        subjectRef: subject.subjectRef,
         audience: 'api.example.com',
         issuedAt: 1_775_219_200,
         expiresAt: 1_775_222_800,
@@ -140,7 +141,8 @@ async function testProtocolObjects() {
             now: 1_775_221_000,
             expectedIssuer: 'issuer.example',
             expectedAudience: 'api.example.com',
-            expectedSubjectId: subject.subjectId,
+            expectedSubjectPublicKey: subject.publicKey,
+            expectedSubjectRef: subject.subjectRef,
             allowedAlgorithms: ['RS256'],
         }),
         'session JWT should verify with RS256 when configured',
@@ -172,10 +174,35 @@ async function testProtocolObjects() {
             now: 1_775_221_000,
             expectedIssuer: 'issuer.example',
             expectedAudience: 'api.example.com',
-            expectedSubjectId: subject.subjectId,
+            expectedSubjectPublicKey: subject.publicKey,
+            expectedSubjectRef: subject.subjectRef,
             allowedAlgorithms: ['RS256'],
         }),
         'session JWT should verify against local JWKS',
+    );
+
+    const invalidClaimsJwt = await new SignJWT({
+        cbio: [],
+    })
+        .setProtectedHeader({ alg: 'RS256', typ: 'JWT', kid: 'kid_rs256_v1' })
+        .setIssuer('issuer.example')
+        .setSubject(subject.subjectRef)
+        .setAudience('api.example.com')
+        .setIssuedAt(1_775_219_200)
+        .setExpirationTime(1_775_222_800)
+        .setJti('jti_invalid_claims')
+        .sign(await importPKCS8(rsaKeys.privateKey, 'RS256'));
+    assert.ok(
+        !(await verifySessionJwtWithJwks(invalidClaimsJwt, {
+            jwks,
+            now: 1_775_221_000,
+            expectedIssuer: 'issuer.example',
+            expectedAudience: 'api.example.com',
+            expectedSubjectPublicKey: subject.publicKey,
+            expectedSubjectRef: subject.subjectRef,
+            allowedAlgorithms: ['RS256'],
+        })),
+        'local JWKS verification should reject invalid session claims',
     );
 }
 

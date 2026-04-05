@@ -1,10 +1,8 @@
 /**
- * Package entry: identity derivation and cryptographic primitives.
- * Pure math layer. Zero dependency on CbioAgent, vault, or errors.
+ * Package entry for the CBIO protocol reference SDK.
  */
 
 export {
-    deriveSubjectId,
     createIdentity,
     createSubjectReference,
     createIdentityDescriptor,
@@ -20,8 +18,15 @@ export {
     serializeIdentityDescriptorPayload,
     serializeRequestProofPayload,
 } from './identity.js';
+export {
+    createSubjectRef,
+    parseSubjectRef,
+    isValidSubjectRef,
+    extractPublicKeyFromSubjectString,
+} from './subject-ref.js';
 export type {
     SubjectIdentity,
+    SubjectRefParts,
     SubjectReference,
     ParentSubjectReference,
     IdentityDescriptor,
@@ -36,7 +41,7 @@ export type {
     VerifySessionJwtOptions,
     VerifySessionJwtWithJwksOptions,
     VerifyRequestProofOptions,
-} from './identity.js';
+} from './types.js';
 export {
     generateNonce,
     signPayload,
@@ -44,4 +49,4 @@ export {
     generateIdentityKeys,
     derivePublicKey,
 } from './crypto.js';
-export type { KeyPair } from './crypto.js';
+export type { KeyPair } from './types.js';

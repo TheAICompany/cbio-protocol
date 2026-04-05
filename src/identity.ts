@@ -1,163 +1,31 @@
 /**
- * Protocol identity and signed object primitives. Pure math layer.
+ * Protocol identity and signed object primitives for the Node reference SDK.
  */
 
 import * as crypto from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import { SignJWT, createLocalJWKSet, decodeJwt, decodeProtectedHeader, exportJWK, importPKCS8, importSPKI, jwtVerify } from 'jose';
 import { generateIdentityKeys, signPayload, verifySignature } from './crypto.js';
+import { createSubjectRef, extractPublicKeyFromSubjectString, parseSubjectRef } from './subject-ref.js';
+import type {
+    CreateIdentityDescriptorOptions,
+    CreateIssuerJwkOptions,
+    CreateRequestProofOptions,
+    CreateSessionJwtOptions,
+    IdentityDescriptor,
+    IssuerJwk,
+    IssuerJwks,
+    ParentSubjectReference,
+    RequestProof,
+    SessionJwtClaims,
+    SubjectIdentity,
+    SubjectReference,
+    VerifyRequestProofOptions,
+    VerifySessionJwtOptions,
+    VerifySessionJwtWithJwksOptions,
+} from './types.js';
 
-export interface SubjectIdentity {
-    privateKey: string;
-    publicKey: string;
-    subjectId: string;
-    keyVersion: number;
-}
-
-export interface SubjectReference {
-    subject_id: string;
-    public_key: string;
-    key_version: number;
-    species?: string;
-    kind_label?: string;
-}
-
-export interface ParentSubjectReference {
-    subject_id: string;
-    public_key: string;
-    key_version: number;
-}
-
-export interface IdentityDescriptor {
-    cbio_protocol: 'v1.0';
-    kind: 'identity_descriptor';
-    subject: SubjectReference & {
-        parent?: ParentSubjectReference;
-        parent_signature?: string;
-        metadata?: Record<string, string>;
-    };
-}
-
-export interface SessionJwtClaims {
-    iss: string;
-    sub: string;
-    aud: string | string[];
-    iat: number;
-    exp: number;
-    jti: string;
-    sid?: string;
-    amr?: string[];
-    cbio_species?: string;
-    cbio_kind?: string;
-    cbio?: Record<string, unknown>;
-}
-
-export interface IssuerJwk {
-    kid: string;
-    alg: 'EdDSA' | 'RS256';
-    use: 'sig';
-    kty: 'OKP' | 'RSA';
-    crv?: 'Ed25519';
-    x?: string;
-    n?: string;
-    e?: string;
-}
-
-export interface IssuerJwks {
-    keys: IssuerJwk[];
-}
-
-export interface RequestProof {
-    cbio_protocol: 'v1.0';
-    kind: 'request_proof';
-    subject: SubjectReference;
-    request: {
-        action: string;
-        issued_at: string;
-        nonce: string;
-        resource?: string;
-        session_id?: string;
-        audience?: string;
-        metadata?: Record<string, string>;
-    };
-    signature: string;
-}
-
-export interface CreateIdentityDescriptorOptions {
-    publicKey: string;
-    keyVersion?: number;
-    species?: string;
-    kindLabel?: string;
-    metadata?: Record<string, string>;
-    parent?: ParentSubjectReference;
-    parentPrivateKey?: string;
-}
-
-export interface CreateSessionJwtOptions {
-    issuer: string;
-    subjectId: string;
-    audience: string | string[];
-    issuedAt: number;
-    expiresAt: number;
-    tokenId: string;
-    issuerPrivateKey: string;
-    algorithm?: 'EdDSA' | 'RS256';
-    keyId?: string;
-    sessionId?: string;
-    authenticationMethods?: string[];
-    species?: string;
-    kind?: string;
-    cbio?: Record<string, unknown>;
-}
-
-export interface VerifySessionJwtOptions {
-    issuerPublicKey: string;
-    now?: number | Date;
-    expectedIssuer?: string;
-    expectedAudience?: string;
-    expectedSubjectId?: string;
-    allowedAlgorithms?: string[];
-}
-
-export interface CreateIssuerJwkOptions {
-    algorithm: 'EdDSA' | 'RS256';
-    keyId: string;
-    publicKey?: string;
-    x?: string;
-    n?: string;
-    e?: string;
-}
-
-export interface VerifySessionJwtWithJwksOptions {
-    jwks: IssuerJwks;
-    now?: number | Date;
-    expectedIssuer?: string;
-    expectedAudience?: string;
-    expectedSubjectId?: string;
-    allowedAlgorithms?: string[];
-}
-
-export interface CreateRequestProofOptions {
-    subject: SubjectReference;
-    request: RequestProof['request'];
-    privateKey: string;
-}
-
-export interface VerifyRequestProofOptions {
-    now?: string | Date;
-    maxAgeMs?: number;
-}
-
-const SUBJECT_ID_PREFIX = 'sub_';
 const CBIO_PROTOCOL_VERSION = 'v1.0';
-const DEFAULT_KEY_VERSION = 1;
-
-function hashPublicKeyToId(publicKey: string, prefix: string): string {
-    const rawKey = Buffer.from(publicKey, 'base64url');
-    const hash = crypto.createHash('sha256').update(rawKey).digest('base64url');
-    return prefix + hash;
-}
-
 function createPrivateKeyFromBase64Url(privateKey: string): crypto.KeyObject {
     return crypto.createPrivateKey({
         key: Buffer.from(privateKey, 'base64url'),
@@ -255,10 +123,20 @@ function normalizeAudience(audience: string | string[]): string | string[] {
 }
 
 function validateSubjectReference(subject: SubjectReference | ParentSubjectReference): boolean {
-    if (!subject.subject_id || !subject.public_key || !Number.isInteger(subject.key_version)) {
+    if (!subject.public_key) {
         return false;
     }
-    return deriveSubjectId(subject.public_key) === subject.subject_id;
+    try {
+        createPublicKeyFromBase64Url(subject.public_key);
+        if ('subject_ref' in subject && subject.subject_ref !== undefined) {
+            if (parseSubjectRef(subject.subject_ref).publicKey !== subject.public_key) {
+                return false;
+            }
+        }
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function validateDecodedSessionJwtClaims(claims: Partial<SessionJwtClaims>): claims is SessionJwtClaims {
@@ -286,29 +164,24 @@ function validateDecodedSessionJwtClaims(claims: Partial<SessionJwtClaims>): cla
     return true;
 }
 
-export function deriveSubjectId(publicKey: string): string {
-    return hashPublicKeyToId(publicKey, SUBJECT_ID_PREFIX);
-}
-
 export function createIdentity(): SubjectIdentity {
     const { privateKey, publicKey } = generateIdentityKeys();
     return {
         privateKey,
         publicKey: publicKey!,
-        subjectId: deriveSubjectId(publicKey!),
-        keyVersion: DEFAULT_KEY_VERSION,
+        subjectRef: createSubjectRef(publicKey!),
     };
 }
 
+export { createSubjectRef };
+
 export function createSubjectReference(publicKey: string, options?: {
-    keyVersion?: number;
     species?: string;
     kindLabel?: string;
 }): SubjectReference {
     return {
-        subject_id: deriveSubjectId(publicKey),
         public_key: publicKey,
-        key_version: options?.keyVersion ?? DEFAULT_KEY_VERSION,
+        subject_ref: createSubjectRef(publicKey),
         species: options?.species,
         kind_label: options?.kindLabel,
     };
@@ -319,9 +192,8 @@ export function serializeIdentityDescriptorPayload(descriptor: IdentityDescripto
         cbio_protocol: descriptor.cbio_protocol,
         kind: descriptor.kind,
         subject: {
-            subject_id: descriptor.subject.subject_id,
             public_key: descriptor.subject.public_key,
-            key_version: descriptor.subject.key_version,
+            subject_ref: descriptor.subject.subject_ref,
             species: descriptor.subject.species,
             kind_label: descriptor.subject.kind_label,
             parent: descriptor.subject.parent,
@@ -335,9 +207,8 @@ export function serializeRequestProofPayload(proof: RequestProof): string {
         cbio_protocol: proof.cbio_protocol,
         kind: proof.kind,
         subject: {
-            subject_id: proof.subject.subject_id,
             public_key: proof.subject.public_key,
-            key_version: proof.subject.key_version,
+            subject_ref: proof.subject.subject_ref,
             species: proof.subject.species,
             kind_label: proof.subject.kind_label,
         },
@@ -358,9 +229,8 @@ export function createIdentityDescriptor(options: CreateIdentityDescriptorOption
         cbio_protocol: CBIO_PROTOCOL_VERSION,
         kind: 'identity_descriptor',
         subject: {
-            subject_id: deriveSubjectId(options.publicKey),
             public_key: options.publicKey,
-            key_version: options.keyVersion ?? DEFAULT_KEY_VERSION,
+            subject_ref: createSubjectRef(options.publicKey),
             species: options.species,
             kind_label: options.kindLabel,
             parent: options.parent,
@@ -428,7 +298,7 @@ export async function createSessionJwt(options: CreateSessionJwtOptions): Promis
     })
         .setProtectedHeader({ alg: algorithm, typ: 'JWT', kid: options.keyId })
         .setIssuer(options.issuer)
-        .setSubject(options.subjectId)
+        .setSubject(options.subjectRef ?? createSubjectRef(options.subjectPublicKey))
         .setAudience(normalizeAudience(options.audience))
         .setIssuedAt(issuedAt)
         .setExpirationTime(expiresAt)
@@ -461,12 +331,21 @@ export async function verifySessionJwt(token: string, options: VerifySessionJwtO
         const verifyResult = await jwtVerify(token, verificationKey, {
             algorithms: allowedAlgorithms,
             issuer: options.expectedIssuer,
-            subject: options.expectedSubjectId,
             audience: options.expectedAudience,
             currentDate: new Date(nowSeconds * 1000),
         });
-
-        return validateDecodedSessionJwtClaims(verifyResult.payload as Partial<SessionJwtClaims>);
+        const claims = verifyResult.payload as Partial<SessionJwtClaims>;
+        if (!validateDecodedSessionJwtClaims(claims)) {
+            return false;
+        }
+        const actualSubjectPublicKey = extractPublicKeyFromSubjectString(claims.sub);
+        if (options.expectedSubjectPublicKey && actualSubjectPublicKey !== options.expectedSubjectPublicKey) {
+            return false;
+        }
+        if (options.expectedSubjectRef && claims.sub !== options.expectedSubjectRef) {
+            return false;
+        }
+        return true;
     } catch {
         return false;
     }
@@ -554,12 +433,21 @@ export async function verifySessionJwtWithJwks(
         const verifyResult = await jwtVerify(token, createLocalJWKSet(options.jwks), {
             algorithms: allowedAlgorithms,
             issuer: options.expectedIssuer,
-            subject: options.expectedSubjectId,
             audience: options.expectedAudience,
             currentDate: new Date(nowSeconds * 1000),
         });
-
-        return validateDecodedSessionJwtClaims(verifyResult.payload as Partial<SessionJwtClaims>);
+        const claims = verifyResult.payload as Partial<SessionJwtClaims>;
+        if (!validateDecodedSessionJwtClaims(claims)) {
+            return false;
+        }
+        const actualSubjectPublicKey = extractPublicKeyFromSubjectString(claims.sub);
+        if (options.expectedSubjectPublicKey && actualSubjectPublicKey !== options.expectedSubjectPublicKey) {
+            return false;
+        }
+        if (options.expectedSubjectRef && claims.sub !== options.expectedSubjectRef) {
+            return false;
+        }
+        return true;
     } catch {
         return false;
     }
@@ -570,9 +458,8 @@ export function createRequestProof(options: CreateRequestProofOptions): RequestP
         cbio_protocol: CBIO_PROTOCOL_VERSION,
         kind: 'request_proof',
         subject: {
-            subject_id: options.subject.subject_id,
             public_key: options.subject.public_key,
-            key_version: options.subject.key_version,
+            subject_ref: options.subject.subject_ref ?? createSubjectRef(options.subject.public_key),
             species: options.subject.species,
             kind_label: options.subject.kind_label,
         },

@@ -10,7 +10,6 @@ Claw-biometric (c-bio) — normative spec and minimal TypeScript primitives.
 This repository contains the canonical protocol specification and the core
 Node.js (TypeScript) implementation for:
 
-- `subject_id` derivation from Ed25519 public keys
 - stable identity descriptors
 - issuer-signed session JWTs
 - subject-signed request proofs
@@ -33,7 +32,8 @@ The protocol scope is intentionally narrow:
 
 The package exposes the protocol-first SDK described by `PROTOCOL.md`, including:
 
-- `createIdentity()` and `deriveSubjectId()`
+- `createIdentity()`
+- `createSubjectRef()`, `parseSubjectRef()`, and `isValidSubjectRef()`
 - `createSubjectReference()`
 - `createIdentityDescriptor()` and `verifyIdentityDescriptor()`
 - `createSessionJwt()` for `EdDSA` or `RS256`, plus `decodeSessionJwtClaims()` and `verifySessionJwt()`
@@ -42,6 +42,12 @@ The package exposes the protocol-first SDK described by `PROTOCOL.md`, including
 - `serializeIdentityDescriptorPayload()`
 - `serializeRequestProofPayload()`
 - `generateIdentityKeys()`, `derivePublicKey()`, `signPayload()`, `verifySignature()`, `generateNonce()`
+
+Browser/runtime split:
+
+- The default Node entry exports the full SDK above.
+- The package `browser` condition exports only session JWT and JWKS helpers.
+- Identity creation, direct key operations, and request signing remain Node-side responsibilities unless a browser-specific implementation is provided separately.
 
 ## Development
 
